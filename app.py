@@ -5,6 +5,22 @@ import subprocess
 import os
 import shutil
 import tempfile
+import re
+
+def parse_arxiv_id(input_str):
+    """Extracts the base arXiv ID from a full URL or dirty string."""
+    # Matches the modern arXiv format: YYMM.NNNNN
+    modern_match = re.search(r"(\d{4}\.\d{4,5})", input_str)
+    if modern_match:
+        return modern_match.group(1)
+        
+    # Matches the older arXiv format (e.g., hep-th/9901001)
+    old_match = re.search(r"([a-z\-]+(?:\.[a-zA-Z]+)?\/\d{7})", input_str)
+    if old_match:
+        return old_match.group(1)
+        
+    # If no pattern matches, return the stripped input as a fallback
+    return input_str.strip()
 
 def download_and_extract(arxiv_id, version, extract_to):
     url = f"https://arxiv.org/e-print/{arxiv_id}v{version}"
@@ -59,12 +75,17 @@ if st.button("Generate Diff PDF"):
     if not arxiv_id or not v1 or not v2:
         st.warning("Please fill in all fields.")
     else:
-        with st.status("Processing paper... this usually takes 1-2 minutes.", expanded=True) as status:
+        # Clean the input to extract just the ID
+        clean_arxiv_id = parse_arxiv_id(arxiv_id)
+        
+        with st.status(f"Processing paper {clean_arxiv_id}... this usually takes 1-2 minutes.", expanded=True) as status:
             try:
                 with tempfile.TemporaryDirectory() as temp_dir:
                     st.write(f"Downloading v{v1} and v{v2}...")
-                    dir_v1 = download_and_extract(arxiv_id, v1, temp_dir)
-                    dir_v2 = download_and_extract(arxiv_id, v2, temp_dir)
+                    
+                    # IMPORTANT: Use clean_arxiv_id here instead of the raw arxiv_id
+                    dir_v1 = download_and_extract(clean_arxiv_id, v1, temp_dir)
+                    dir_v2 = download_and_extract(clean_arxiv_id, v2, temp_dir)
                     
                     st.write("Locating main .tex files...")
                     tex_v1 = find_main_tex(dir_v1)
