@@ -64,7 +64,7 @@ st.title("VibeArxivDiff")
 st.write("Generate a `latexdiff` PDF between two versions of an arXiv paper. Math markup is disabled to ensure compilation stability.")
 
 # Input fields
-arxiv_id = st.text_input("ArXiv ID", value="2303.00096")
+arxiv_id = st.text_input("ArXiv ID or URL", value="2303.00096")
 col1, col2 = st.columns(2)
 with col1:
     v1 = st.text_input("Old Version", value="1")
@@ -93,7 +93,9 @@ if st.button("Generate Diff PDF"):
                     
                     st.write("Running latexdiff...")
                     diff_tex_path = os.path.join(dir_v2, "diff.tex")
-                    with open(diff_tex_path, "w", encoding="utf-8") as f:
+                    
+                    # FIX 1: Open in binary mode ("wb") so we don't force UTF-8 decoding
+                    with open(diff_tex_path, "wb") as f:
                         subprocess.run(
                             ["latexdiff", "--math-markup=0", os.path.abspath(tex_v1), os.path.abspath(tex_v2)], 
                             stdout=f, 
@@ -106,7 +108,8 @@ if st.button("Generate Diff PDF"):
                         ["latexmk", "-pdf", "-f", "-interaction=nonstopmode", "diff.tex"], 
                         cwd=dir_v2,
                         capture_output=True, 
-                        text=True # Capture output as string for the error log
+                        text=True,
+                        errors="replace" # FIX 2: Replaces weird log characters instead of crashing
                     )
                     
                     final_pdf = os.path.join(dir_v2, "diff.pdf")
