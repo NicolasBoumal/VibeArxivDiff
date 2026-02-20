@@ -59,20 +59,18 @@ if st.button("Generate Diff PDF"):
     if not arxiv_id or not v1 or not v2:
         st.warning("Please fill in all fields.")
     else:
-        with st.spinner("Downloading, diffing, and compiling... this usually takes 1-2 minutes."):
+        with st.status("Processing paper... this usually takes 1-2 minutes.", expanded=True) as status:
             try:
-                # Create a sandboxed temporary directory for this specific run
                 with tempfile.TemporaryDirectory() as temp_dir:
-                    
-                    # 1. Download and extract both versions
+                    st.write(f"Downloading v{v1} and v{v2}...")
                     dir_v1 = download_and_extract(arxiv_id, v1, temp_dir)
                     dir_v2 = download_and_extract(arxiv_id, v2, temp_dir)
                     
-                    # 2. Locate the main .tex files
+                    st.write("Locating main .tex files...")
                     tex_v1 = find_main_tex(dir_v1)
                     tex_v2 = find_main_tex(dir_v2)
                     
-                    # 3. Run latexdiff (writing output to the v2 folder so it has access to the latest figures)
+                    st.write("Running latexdiff...")
                     diff_tex_path = os.path.join(dir_v2, "diff.tex")
                     with open(diff_tex_path, "w", encoding="utf-8") as f:
                         subprocess.run(
@@ -82,22 +80,21 @@ if st.button("Generate Diff PDF"):
                             check=True
                         )
                     
-                    # 4. Compile the diff.tex using latexmk
-                    subprocess.run(
+                    st.write("Compiling PDF...")
+                    compile_process = subprocess.run(
                         ["latexmk", "-pdf", "-f", "-interaction=nonstopmode", "diff.tex"], 
                         cwd=dir_v2,
-                        capture_output=True # Suppress the heavy console output in the server logs
+                        capture_output=True, 
+                        text=True # Capture output as string for the error log
                     )
                     
                     final_pdf = os.path.join(dir_v2, "diff.pdf")
                     
-                    # 5. Check if the PDF was generated and offer it for download
                     if os.path.exists(final_pdf):
-                        # Read bytes into memory before the temp folder is destroyed
                         with open(final_pdf, "rb") as pdf_file:
                             pdf_bytes = pdf_file.read()
                             
-                        st.success("Compilation successful!")
+                        status.update(label="Compilation successful!", state="complete", expanded=False)
                         st.download_button(
                             label="Download Diff PDF",
                             data=pdf_bytes,
@@ -105,11 +102,29 @@ if st.button("Generate Diff PDF"):
                             mime="application/pdf"
                         )
                     else:
-                        st.error("Compilation failed. The LaTeX source might have unresolvable errors or rely on missing packages.")
+                        status.update(label="Compilation failed.", state="error", expanded=False)
+                        st.error("The cloud server is missing a package required by this paper, or latexdiff created unresolvable syntax.")
                         
+                        # Escape Hatch: Zip the folder and offer it for download
+                        zip_path = shutil.make_archive(dir_v2, 'zip', dir_v2)
+                        with open(zip_path, "rb") as zip_file:
+                            st.download_button(
+                                label="Download Source Files (.zip) to Compile Locally",
+                                data=zip_file.read(),
+                                file_name=f"{arxiv_id}_v{v1}_to_v{v2}_source.zip",
+                                mime="application/zip"
+                            )
+                            
+                        # Surface the error log for debugging
+                        with st.expander("View latexmk error log"):
+                            st.code(compile_process.stdout, language="text")
+                            
             except FileNotFoundError as e:
+                status.update(label="Error locating files.", state="error")
                 st.error(str(e))
             except subprocess.CalledProcessError:
+                status.update(label="latexdiff error.", state="error")
                 st.error("latexdiff failed to run. Check the file structures.")
             except Exception as e:
+                status.update(label="Unexpected error.", state="error")
                 st.error(f"An unexpected error occurred: {e}")
