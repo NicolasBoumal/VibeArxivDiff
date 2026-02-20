@@ -5,5 +5,6 @@ texlive-fonts-extra
 texlive-science
 texlive-publishers
 texlive-pictures
+texlive-bibtex-extra
 latexdiff
 latexmk
