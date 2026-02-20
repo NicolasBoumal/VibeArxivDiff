@@ -48,7 +48,7 @@ st.title("VibeArxivDiff")
 st.write("Generate a `latexdiff` PDF between two versions of an arXiv paper. Math markup is disabled to ensure compilation stability.")
 
 # Input fields
-arxiv_id = st.text_input("ArXiv ID", value="2510.23513")
+arxiv_id = st.text_input("ArXiv ID", value="2303.00096")
 col1, col2 = st.columns(2)
 with col1:
     v1 = st.text_input("Old Version", value="1")
